@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="中大儿科学博士笔试医学英语移动闪卡：英文术语、英文名词解释与医学英语翻译。">
+  <title>儿科学医学英语闪卡</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="icon-button" id="homeButton" aria-label="返回首页" title="返回首页">
+        <span aria-hidden="true">⌂</span>
+      </button>
+      <div class="brand">
+        <p>中大博士笔试 · 儿科学</p>
+        <h1>医学英语闪卡</h1>
+      </div>
+      <button class="icon-button" id="themeButton" aria-label="切换深色模式" title="切换深色模式">
+        <span aria-hidden="true">◐</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="screen active" id="dashboardScreen" aria-labelledby="dashboardTitle">
+        <div class="hero-card">
+          <div>
+            <span class="eyebrow">MOBILE STUDY DECK</span>
+            <h2 id="dashboardTitle">今天，背一小组就够了</h2>
+            <p>术语、英文解释与双向翻译，按你的熟悉度自动留下复习痕迹。</p>
+          </div>
+          <div class="streak" aria-label="连续学习天数">
+            <strong id="streakValue">0</strong>
+            <span>连续天</span>
+          </div>
+        </div>
+
+        <div class="stats-grid" aria-label="学习统计">
+          <article><span>今日完成</span><strong id="todayValue">0</strong><small>张</small></article>
+          <article><span>累计掌握</span><strong id="masteredValue">0</strong><small>张</small></article>
+          <article><span>待复习</span><strong id="reviewValue">0</strong><small>张</small></article>
+        </div>
+
+        <section class="panel quick-start" aria-labelledby="quickTitle">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">QUICK START</span>
+              <h2 id="quickTitle">选择今天的练习</h2>
+            </div>
+            <button class="text-button" id="shuffleAllButton">随机 20 张</button>
+          </div>
+          <div class="deck-grid">
+            <button class="deck-option" data-mode="word">
+              <span class="deck-icon">Aa</span>
+              <span><strong>单词卡</strong><small>英文 → 中文</small></span>
+              <b>60</b>
+            </button>
+            <button class="deck-option" data-mode="definition">
+              <span class="deck-icon">Df</span>
+              <span><strong>英文名词解释</strong><small>术语 → 英文定义</small></span>
+              <b>60</b>
+            </button>
+            <button class="deck-option" data-mode="translation">
+              <span class="deck-icon">译</span>
+              <span><strong>医学英语翻译</strong><small>英译中 + 中译英</small></span>
+              <b>20</b>
+            </button>
+            <button class="deck-option accent" data-mode="review">
+              <span class="deck-icon">↻</span>
+              <span><strong>错题复习</strong><small>优先练“模糊 / 不会”</small></span>
+              <b id="reviewDeckCount">0</b>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="browseTitle">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">BROWSE</span>
+              <h2 id="browseTitle">词库浏览</h2>
+            </div>
+            <button class="text-button" id="favoritesButton">只看收藏</button>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" placeholder="搜索英文、中文或主题" autocomplete="off">
+          </label>
+          <div class="chip-row" id="categoryChips" aria-label="按系统筛选"></div>
+          <div class="library-list" id="libraryList"></div>
+        </section>
+      </section>
+
+      <section class="screen" id="studyScreen" aria-labelledby="studyTitle">
+        <div class="study-header">
+          <button class="back-button" id="backButton" aria-label="退出本轮学习">←</button>
+          <div>
+            <span id="studyModeLabel">单词卡</span>
+            <h2 id="studyTitle"><b id="currentIndex">1</b> / <span id="totalCards">20</span></h2>
+          </div>
+          <button class="icon-button" id="favoriteCardButton" aria-label="收藏当前卡片">☆</button>
+        </div>
+        <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
+
+        <div class="card-stage">
+          <article class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="学习卡片，点击翻面">
+            <div class="card-face card-front">
+              <div class="card-meta">
+                <span id="cardCategory">新生儿</span>
+                <button class="speak-button" id="speakButton" aria-label="朗读英文">◖))</button>
+              </div>
+              <div class="card-content">
+                <p id="frontKicker">TERM</p>
+                <h3 id="frontText">preterm infant</h3>
+                <p id="frontHint">点击卡片查看答案</p>
+              </div>
+              <span class="tap-tip">轻触翻面</span>
+            </div>
+            <div class="card-face card-back">
+              <div class="card-meta"><span id="backLabel">中文释义</span><span>ANSWER</span></div>
+              <div class="card-content answer-content">
+                <h3 id="backTitle">早产儿</h3>
+                <p id="backText">An infant born before 37 completed weeks of gestation.</p>
+                <div class="keyword-box" id="keywordBox" hidden>
+                  <span>核对词</span><p id="keywordText"></p>
+                </div>
+              </div>
+              <span class="tap-tip">再次轻触返回题面</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="reveal-prompt" id="revealPrompt">先回忆，再点击卡片翻面</div>
+        <div class="rating-row" id="ratingRow" aria-label="评价熟悉度">
+          <button data-rating="again"><span>×</span><strong>不会</strong><small>很快再来</small></button>
+          <button data-rating="hard"><span>△</span><strong>模糊</strong><small>稍后复习</small></button>
+          <button data-rating="good"><span>✓</span><strong>掌握</strong><small>降低频率</small></button>
+        </div>
+      </section>
+
+      <section class="screen" id="summaryScreen" aria-labelledby="summaryTitle">
+        <div class="summary-card">
+          <span class="summary-mark">✓</span>
+          <span class="eyebrow">SESSION COMPLETE</span>
+          <h2 id="summaryTitle">这一组完成了</h2>
+          <p>短时、重复、带反馈，才是手机背诵最有效的节奏。</p>
+          <div class="summary-stats">
+            <div><strong id="summaryTotal">0</strong><span>完成</span></div>
+            <div><strong id="summaryGood">0</strong><span>掌握</span></div>
+            <div><strong id="summaryHard">0</strong><span>待复习</span></div>
+          </div>
+          <button class="primary-button" id="reviewAgainButton">复习本轮错题</button>
+          <button class="secondary-button" id="finishButton">返回首页</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
