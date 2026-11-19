@@ -2,7 +2,12 @@
   "use strict";
 
   const DATA = window.CARD_DATA || { terms: [], translations: [] };
-  const STORAGE_KEY = "zhongda-med-english-cards-v1";
+  const GENERAL_TERMS = window.GENERAL_MEDICAL_TERMS || [];
+  const Progress = window.FlashProgress;
+  const LEGACY_KEY = "zhongda-med-english-cards-v1";
+  const GUEST_KEY = "zhongda-med-english-guest-v2";
+  const DEVICE_KEY = "zhongda-med-english-device";
+  const THEME_KEY = "zhongda-med-english-theme";
   const dayKey = (date = new Date()) => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
     .map((part) => String(part).padStart(2, "0")).join("-");
   const DEFAULT_WORD_GOAL = 20;
@@ -10,18 +15,13 @@
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-  const defaultStore = {
-    theme: "light",
-    ratings: {},
-    favorites: {},
-    streak: 0,
-    lastStudyDate: null,
-    dailyWordGoal: DEFAULT_WORD_GOAL,
-    todayDate: dayKey(),
-    todayCount: 0
-  };
-
-  let store = loadStore();
+  const legacy = readJSON(LEGACY_KEY);
+  const device = localStorage.getItem(DEVICE_KEY) || crypto.randomUUID();
+  localStorage.setItem(DEVICE_KEY, device);
+  let guest = loadGuest();
+  let store = guest;
+  let cloud = null;
+  let accountId = null;
   let session = [];
   let sessionIndex = 0;
   let sessionMode = "word";
@@ -37,19 +37,40 @@
     summary: $("#summaryScreen")
   };
 
-  function loadStore() {
+  function readJSON(key) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-      const merged = { ...defaultStore, ...parsed };
-      merged.dailyWordGoal = normalizeWordGoal(merged.dailyWordGoal, DEFAULT_WORD_GOAL);
-      return merged;
+      return JSON.parse(localStorage.getItem(key) || "null");
     } catch {
-      return { ...defaultStore };
+      return null;
     }
   }
 
-  function saveStore() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  function loadGuest() {
+    const cached = readJSON(GUEST_KEY);
+    if (cached?.version === 1) return Progress.normalize(cached);
+    return Progress.fromLegacy(legacy, `${device}-guest`);
+  }
+
+  function changeProgress(change) {
+    const synced = cloud?.edit(change);
+    if (synced) {
+      store = synced;
+      return;
+    }
+    // Read current guest data first in case a second tab has made changes.
+    guest = Progress.merge(guest, loadGuest());
+    change(guest);
+    store = guest;
+    localStorage.setItem(GUEST_KEY, JSON.stringify(guest));
+  }
+
+  function applyAccount(snapshot, id) {
+    const accountChanged = (id || null) !== accountId;
+    accountId = id || null;
+    store = snapshot || guest;
+    if (accountChanged && !screens.dashboard.classList.contains("active")) goHome();
+    else if (screens.dashboard.classList.contains("active")) renderDashboard();
+    else if (screens.study.classList.contains("active")) renderCardFavorite();
   }
 
   function normalizeWordGoal(value, fallback) {
@@ -57,11 +78,14 @@
     return Math.min(MAX_WORD_GOAL, Math.max(1, Math.trunc(value)));
   }
 
-  function refreshDay() {
-    const today = dayKey();
-    if (store.todayDate === today) return;
-    store.todayDate = today;
-    store.todayCount = 0;
+  function wordGoal() { return store.goal?.value ?? DEFAULT_WORD_GOAL; }
+
+  function isFavorite(id) { return store.favorites[id]?.value === true; }
+
+  function changeFavorite(id) {
+    return changeProgress((snapshot) => {
+      snapshot.favorites[id] = { value: !snapshot.favorites[id]?.value, at: Date.now() };
+    });
   }
 
   function shuffle(items) {
@@ -73,17 +97,21 @@
     return copy;
   }
 
-  function daysBetween(a, b) {
-    return Math.round((new Date(b) - new Date(a)) / 86400000);
-  }
-
   function allUnits() {
-    const words = DATA.terms.map((item, index) => ({
+    const pediatric = DATA.terms.map((item, index) => ({
       ...item,
       id: `term-${index + 1}`,
       unitKey: `word:term-${index + 1}`,
       mode: "word"
     }));
+    const general = GENERAL_TERMS.map((item, index) => ({
+      ...item,
+      id: `general-${index + 1}`,
+      unitKey: `word:general-${index + 1}`,
+      mode: "word",
+      general: true
+    }));
+    const words = [...pediatric, ...general];
     const definitions = DATA.terms.map((item, index) => ({
       ...item,
       id: `term-${index + 1}`,
@@ -97,7 +125,7 @@
       category: item.direction,
       mode: "translation"
     }));
-    return { words, definitions, translations, all: [...words, ...definitions, ...translations] };
+    return { words, general, definitions, translations, all: [...words, ...definitions, ...translations] };
   }
 
   function isDue(unit) {
@@ -112,9 +140,19 @@
       return !updatedAt || dayKey(new Date(updatedAt)) !== today;
     });
     const completed = words.length - remaining.length;
-    const goal = store.dailyWordGoal;
+    const goal = wordGoal();
     if (completed >= goal) return { completed, pool: words, roundSize: Math.min(goal, words.length) };
     return { completed, pool: remaining, roundSize: Math.min(goal - completed, remaining.length) };
+  }
+
+  function prioritizedWords(pool) {
+    const needsPractice = (unit) => !store.ratings[unit.unitKey] || isDue(unit);
+    const groups = [[], [], [], []];
+    for (const unit of pool) {
+      const index = (unit.general ? 1 : 0) + (needsPractice(unit) ? 0 : 2);
+      groups[index].push(unit);
+    }
+    return groups.flatMap(shuffle);
   }
 
   function buildDeck(mode, specificUnit = null) {
@@ -122,7 +160,13 @@
     if (specificUnit) return [specificUnit];
     if (mode === "word") {
       const { pool, roundSize } = dailyWordPlan(units.words);
-      return shuffle(pool).slice(0, roundSize);
+      return prioritizedWords(pool).slice(0, roundSize);
+    }
+    if (mode === "general") {
+      const { pool, roundSize } = dailyWordPlan(units.words);
+      const eligible = pool.filter((unit) => unit.general);
+      return eligible.length ? prioritizedWords(eligible).slice(0, roundSize) :
+        prioritizedWords(units.general).slice(0, wordGoal());
     }
     if (mode === "definition") return shuffle(units.definitions).slice(0, 20);
     if (mode === "translation") return shuffle(units.translations).slice(0, 20);
@@ -130,7 +174,7 @@
       const review = units.all.filter(isDue);
       return shuffle(review).slice(0, 30);
     }
-    return shuffle(units.all).slice(0, 20);
+    return shuffle(units.all.filter((unit) => !unit.general)).slice(0, 20);
   }
 
   function setScreen(name) {
@@ -153,7 +197,7 @@
   }
 
   function modeLabel(mode) {
-    return ({ word: "单词卡", definition: "英文名词解释", translation: "医学英语翻译", review: "错题复习", mixed: "随机混合" })[mode] || "医学英语闪卡";
+    return ({ word: "单词卡", general: "通用医学单词", definition: "英文名词解释", translation: "医学英语翻译", review: "错题复习", mixed: "随机混合" })[mode] || "医学英语闪卡";
   }
 
   function currentUnit() { return session[sessionIndex]; }
@@ -167,8 +211,7 @@
     $("#currentIndex").textContent = sessionIndex + 1;
     $("#totalCards").textContent = session.length;
     $("#progressBar").style.width = `${(sessionIndex / session.length) * 100}%`;
-    $("#favoriteCardButton").textContent = store.favorites[unit.id] ? "★" : "☆";
-    $("#favoriteCardButton").setAttribute("aria-pressed", store.favorites[unit.id] ? "true" : "false");
+    renderCardFavorite();
 
     const view = cardView(unit);
     $("#cardCategory").textContent = view.category;
@@ -181,6 +224,13 @@
     $("#keywordBox").hidden = !view.keywords;
     $("#keywordText").textContent = view.keywords || "";
     $("#speakButton").hidden = !view.speak;
+  }
+
+  function renderCardFavorite() {
+    const unit = currentUnit();
+    if (!unit) return;
+    $("#favoriteCardButton").textContent = isFavorite(unit.id) ? "★" : "☆";
+    $("#favoriteCardButton").setAttribute("aria-pressed", String(isFavorite(unit.id)));
   }
 
   function cardView(unit) {
@@ -235,33 +285,24 @@
 
   function rateCard(status) {
     if (!flipped) return;
-    refreshDay();
     const unit = currentUnit();
-    const previous = store.ratings[unit.unitKey] || { count: 0 };
-    const count = (previous.count || 0) + 1;
-    const intervals = status === "good" ? [3, 7, 15, 30] : status === "hard" ? [1] : [0];
-    const intervalDays = intervals[Math.min(count - 1, intervals.length - 1)];
-    const nextDue = Date.now() + (status === "again" ? 10 * 60 * 1000 : intervalDays * 86400000);
-    store.ratings[unit.unitKey] = { status, count, nextDue, updatedAt: Date.now() };
-    store.todayCount += 1;
-    updateStreak();
+    changeProgress((snapshot) => {
+      const count = (snapshot.ratings[unit.unitKey]?.count || 0) + 1;
+      const intervals = status === "good" ? [3, 7, 15, 30] : status === "hard" ? [1] : [0];
+      const intervalDays = intervals[Math.min(count - 1, intervals.length - 1)];
+      const updatedAt = Date.now();
+      const nextDue = updatedAt + (status === "again" ? 10 * 60 * 1000 : intervalDays * 86400000);
+      snapshot.ratings[unit.unitKey] = { status, count, nextDue, updatedAt };
+      Progress.recordDay(snapshot, `${device}-${accountId ? "cloud" : "guest"}`, dayKey(new Date(updatedAt)));
+    });
     sessionResults[status] += 1;
 
     if (status === "again" && !unit.requeued) {
       session.push({ ...unit, requeued: true });
       toast("已放回本轮后面，再见一次");
     }
-    saveStore();
     sessionIndex += 1;
     renderCard();
-  }
-
-  function updateStreak() {
-    const today = dayKey();
-    if (store.lastStudyDate === today) return;
-    if (store.lastStudyDate && daysBetween(store.lastStudyDate, today) === 1) store.streak += 1;
-    else store.streak = 1;
-    store.lastStudyDate = today;
   }
 
   function showSummary() {
@@ -276,11 +317,9 @@
   function toggleFavorite() {
     const unit = currentUnit();
     if (!unit) return;
-    if (store.favorites[unit.id]) delete store.favorites[unit.id];
-    else store.favorites[unit.id] = true;
-    saveStore();
-    renderCard();
-    toast(store.favorites[unit.id] ? "已收藏" : "已取消收藏");
+    changeFavorite(unit.id);
+    renderCardFavorite();
+    toast(isFavorite(unit.id) ? "已收藏" : "已取消收藏");
   }
 
   function speakCurrent(event) {
@@ -297,29 +336,32 @@
   }
 
   function renderDashboard() {
-    refreshDay();
     const units = allUnits().all;
     const mastered = Object.values(store.ratings).filter((x) => x.status === "good").length;
     const review = units.filter(isDue).length;
-    $("#streakValue").textContent = store.streak || 0;
-    $("#todayValue").textContent = store.todayCount || 0;
+    $("#streakValue").textContent = Progress.streak(store);
+    $("#todayValue").textContent = Progress.todayCount(store, dayKey());
     $("#masteredValue").textContent = mastered;
     $("#reviewValue").textContent = review;
     $("#reviewDeckCount").textContent = review;
-    $("#dailyWordGoal").value = store.dailyWordGoal;
+    const input = $("#dailyWordGoal");
+    if (document.activeElement !== input) input.value = wordGoal();
     renderWordGoal();
     renderLibrary();
   }
 
   function renderWordGoal() {
-    const goal = store.dailyWordGoal;
-    const { completed, roundSize } = dailyWordPlan(allUnits().words);
+    const goal = wordGoal();
+    const { words, general } = allUnits();
+    const { completed, roundSize } = dailyWordPlan(words);
     $("#dailyWordProgress").textContent = `今天已背 ${completed} / ${goal} 个${completed >= goal ? " · 已达标" : ""}`;
-    $("#wordDeckDetail").textContent = `本轮 ${roundSize} 张 · 英文 → 中文`;
+    $("#wordDeckDetail").textContent = `儿科优先 · 本轮 ${roundSize} 张`;
+    $("#wordDeckCount").textContent = words.length;
+    $("#generalDeckCount").textContent = general.length;
   }
 
   function renderCategoryChips() {
-    const categories = ["全部", ...new Set(DATA.terms.map((x) => x.category))];
+    const categories = ["全部", "儿科", "通用医学", ...new Set(allUnits().words.map((unit) => unit.category))];
     $("#categoryChips").innerHTML = categories.map((category) =>
       `<button class="chip${category === categoryFilter ? " active" : ""}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`
     ).join("");
@@ -333,8 +375,9 @@
   function renderLibrary() {
     const query = $("#searchInput").value.trim().toLowerCase();
     const units = allUnits().words.filter((unit) => {
-      const matchesCategory = categoryFilter === "全部" || unit.category === categoryFilter;
-      const matchesFavorite = !showFavoritesOnly || store.favorites[unit.id];
+      const matchesCategory = categoryFilter === "全部" || unit.category === categoryFilter ||
+        (categoryFilter === "儿科" && !unit.general) || (categoryFilter === "通用医学" && unit.general);
+      const matchesFavorite = !showFavoritesOnly || isFavorite(unit.id);
       const haystack = `${unit.term} ${unit.chinese} ${unit.definition} ${unit.category}`.toLowerCase();
       return matchesCategory && matchesFavorite && (!query || haystack.includes(query));
     });
@@ -344,7 +387,7 @@
           <strong>${escapeHtml(unit.term)}</strong>
           <small>${escapeHtml(unit.chinese)} · ${escapeHtml(unit.category)}</small>
         </button>
-        <button class="favorite-mini" data-favorite-unit="${unit.id}" aria-label="收藏 ${escapeHtml(unit.term)}">${store.favorites[unit.id] ? "★" : "☆"}</button>
+        <button class="favorite-mini" data-favorite-unit="${unit.id}" aria-label="收藏 ${escapeHtml(unit.term)}" aria-pressed="${isFavorite(unit.id)}">${isFavorite(unit.id) ? "★" : "☆"}</button>
       </article>`).join("") : `<div class="empty-state">没有找到匹配的卡片</div>`;
 
     $$("[data-open-unit]").forEach((button) => button.addEventListener("click", () => {
@@ -353,8 +396,7 @@
     }));
     $$("[data-favorite-unit]").forEach((button) => button.addEventListener("click", () => {
       const id = button.dataset.favoriteUnit;
-      if (store.favorites[id]) delete store.favorites[id]; else store.favorites[id] = true;
-      saveStore();
+      changeFavorite(id);
       renderLibrary();
     }));
   }
@@ -378,17 +420,16 @@
   }
 
   function toggleTheme() {
-    store.theme = store.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = store.theme;
-    saveStore();
+    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
   }
 
   function bindEvents() {
     const wordGoalInput = $("#dailyWordGoal");
     function setWordGoal(goal) {
-      if (goal === store.dailyWordGoal) return;
-      store.dailyWordGoal = goal;
-      saveStore();
+      if (goal === wordGoal()) return;
+      changeProgress((snapshot) => { snapshot.goal = { value: goal, at: Date.now() }; });
       renderWordGoal();
     }
     wordGoalInput.addEventListener("input", () => {
@@ -396,8 +437,8 @@
       if (Number.isInteger(goal) && goal >= 1 && goal <= MAX_WORD_GOAL) setWordGoal(goal);
     });
     wordGoalInput.addEventListener("change", () => {
-      setWordGoal(normalizeWordGoal(wordGoalInput.valueAsNumber, store.dailyWordGoal));
-      wordGoalInput.value = store.dailyWordGoal;
+      setWordGoal(normalizeWordGoal(wordGoalInput.valueAsNumber, wordGoal()));
+      wordGoalInput.value = wordGoal();
     });
     $$(".deck-option").forEach((button) => button.addEventListener("click", () => startSession(button.dataset.mode)));
     $("#shuffleAllButton").addEventListener("click", () => startSession("mixed"));
@@ -434,10 +475,11 @@
   }
 
   function init() {
-    document.documentElement.dataset.theme = store.theme;
+    document.documentElement.dataset.theme = (localStorage.getItem(THEME_KEY) || legacy?.theme) === "dark" ? "dark" : "light";
     renderCategoryChips();
     bindEvents();
     renderDashboard();
+    cloud = window.FlashCloud.start({ getGuest: () => Progress.merge(guest, loadGuest()), apply: applyAccount });
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("service-worker.js").catch(() => {});
   }
 
