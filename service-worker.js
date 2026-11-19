@@ -1,6 +1,7 @@
 const CACHE_PREFIX = "med-english-cards-";
-const CACHE = `${CACHE_PREFIX}v2`;
-const ASSETS = ["./", "index.html", "styles.css?v=2", "data.js", "app.js?v=2", "manifest.webmanifest", "icon.svg"];
+const CACHE = `${CACHE_PREFIX}v3`;
+const ASSETS = ["./", "index.html", "styles.css?v=3", "data.js", "general-terms.js?v=3", "progress.js?v=3", "cloud-config.js?v=3",
+  "cloud.js?v=3", "app.js?v=3", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
