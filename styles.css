@@ -118,6 +118,17 @@ main { padding: 10px 16px calc(30px + var(--safe-bottom)); }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .section-heading h2 { margin: 4px 0 0; font-size: 21px; }
 .text-button { border: 0; background: none; color: var(--teal); font-weight: 700; font-size: 13px; cursor: pointer; padding: 8px 0; }
+.word-goal {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;
+  padding: 12px 14px; border-radius: 16px; background: var(--bg);
+}
+.word-goal label { font-size: 15px; font-weight: 700; }
+.word-goal p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.word-goal-field { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.word-goal-field input {
+  width: 4.25rem; min-height: 44px; padding: 6px 8px; text-align: center; color: var(--ink);
+  font-size: 16px; border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
+}
 .deck-grid { display: grid; gap: 10px; }
 .deck-option {
   width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 18px;
@@ -165,28 +176,28 @@ main { padding: 10px 16px calc(30px + var(--safe-bottom)); }
 .study-header h2 { margin: 2px 0 0; font-size: 15px; }
 .progress-track { height: 5px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .progress-track span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--teal), #4bb8aa); transition: width .25s; }
-.card-stage { perspective: 1200px; padding: 24px 0 14px; }
+.card-stage { padding: 24px 0 14px; }
 .flashcard {
-  position: relative; min-height: clamp(385px, 62vh, 520px); transform-style: preserve-3d; transition: transform .5s cubic-bezier(.2,.7,.2,1);
-  cursor: pointer; user-select: none;
+  display: grid; min-height: clamp(330px, 60vh, 520px); cursor: pointer; user-select: none;
 }
-.flashcard.flipped { transform: rotateY(180deg); }
 .card-face {
-  position: absolute; inset: 0; backface-visibility: hidden; border-radius: 30px; padding: 22px;
+  position: relative; min-width: 0; border-radius: 30px; padding: clamp(16px, 5vw, 22px);
   display: flex; flex-direction: column; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden;
 }
+.card-face[hidden] { display: none; }
 .card-front { background: linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface-2) 55%, var(--surface))); }
 .card-front::after {
   content: ""; position: absolute; width: 180px; height: 180px; border-radius: 50%;
   background: color-mix(in srgb, var(--teal) 8%, transparent); right: -60px; bottom: -80px;
 }
-.card-back { background: var(--surface); transform: rotateY(180deg); }
+.card-back { background: var(--surface); }
 .card-meta { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .card-meta > span:first-child { color: var(--teal); font-weight: 800; }
 .speak-button { border: 1px solid var(--line); background: var(--surface); color: var(--teal); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; }
-.card-content { flex: 1; display: grid; place-content: center; text-align: center; position: relative; z-index: 1; }
+.card-content { flex: 1; display: grid; place-content: center; text-align: center; position: relative; z-index: 1; padding-block: 18px; overflow-wrap: anywhere; }
 .card-content > p:first-child { color: var(--muted); letter-spacing: .15em; font-size: 10px; font-weight: 800; margin: 0 0 14px; }
 .card-content h3 { font-size: clamp(30px, 9vw, 46px); line-height: 1.16; margin: 0; overflow-wrap: anywhere; }
+.flashcard[data-mode="translation"] #frontText { font-size: clamp(21px, 5.8vw, 30px); line-height: 1.35; }
 .card-content #frontHint { margin: 18px auto 0; max-width: 90%; color: var(--muted); font-size: 13px; line-height: 1.6; letter-spacing: normal; font-weight: 400; }
 .answer-content h3 { color: var(--teal-dark); font-size: clamp(27px, 8vw, 40px); }
 .answer-content #backText { font-size: clamp(16px, 4.8vw, 21px); line-height: 1.65; margin: 20px 0 0; color: var(--ink); }

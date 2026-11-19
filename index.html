@@ -8,7 +8,7 @@
   <title>儿科学医学英语闪卡</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
   <div class="app-shell">
@@ -53,10 +53,20 @@
             </div>
             <button class="text-button" id="shuffleAllButton">随机 20 张</button>
           </div>
+          <div class="word-goal">
+            <div>
+              <label for="dailyWordGoal">每日背词目标</label>
+              <p id="dailyWordProgress" role="status">今天已背 0 / 20 个</p>
+            </div>
+            <div class="word-goal-field">
+              <input id="dailyWordGoal" type="number" min="1" max="60" step="1" value="20" inputmode="numeric">
+              <span aria-hidden="true">个</span>
+            </div>
+          </div>
           <div class="deck-grid">
             <button class="deck-option" data-mode="word">
               <span class="deck-icon">Aa</span>
-              <span><strong>单词卡</strong><small>英文 → 中文</small></span>
+              <span><strong>单词卡</strong><small id="wordDeckDetail">本轮 20 张 · 英文 → 中文</small></span>
               <b>60</b>
             </button>
             <button class="deck-option" data-mode="definition">
@@ -106,7 +116,7 @@
         <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
 
         <div class="card-stage">
-          <article class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="学习卡片，点击翻面">
+          <article class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="学习卡片，点击翻面" aria-expanded="false" aria-controls="cardAnswer">
             <div class="card-face card-front">
               <div class="card-meta">
                 <span id="cardCategory">新生儿</span>
@@ -119,7 +129,7 @@
               </div>
               <span class="tap-tip">轻触翻面</span>
             </div>
-            <div class="card-face card-back">
+            <div class="card-face card-back" id="cardAnswer" hidden>
               <div class="card-meta"><span id="backLabel">中文释义</span><span>ANSWER</span></div>
               <div class="card-content answer-content">
                 <h3 id="backTitle">早产儿</h3>
@@ -161,6 +171,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="data.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
