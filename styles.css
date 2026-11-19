@@ -129,6 +129,21 @@ main { padding: 10px 16px calc(30px + var(--safe-bottom)); }
   width: 4.25rem; min-height: 44px; padding: 6px 8px; text-align: center; color: var(--ink);
   font-size: 16px; border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
 }
+.cloud-panel h2 { margin: 0; font-size: 21px; }
+.cloud-panel p { margin: 6px 0 14px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.cloud-form { display: grid; gap: 10px; }
+.cloud-form[hidden] { display: none; }
+.cloud-form label { display: grid; gap: 5px; font-size: 14px; }
+.cloud-form input {
+  min-height: 44px; min-width: 0; width: 100%; padding: 8px 12px; color: var(--ink); font-size: 16px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+}
+.cloud-account-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.cloud-account-name span { color: var(--muted); font-size: 14px; }
+.cloud-profile { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.cloud-profile .secondary-button { margin: 0; min-height: 44px; padding: 8px 12px; font-size: 14px; }
+.cloud-actions { display: flex; flex-wrap: wrap; column-gap: 18px; }
+.cloud-actions button { min-height: 44px; font-size: 14px; }
 .deck-grid { display: grid; gap: 10px; }
 .deck-option {
   width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 18px;
