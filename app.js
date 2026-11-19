@@ -3,7 +3,10 @@
 
   const DATA = window.CARD_DATA || { terms: [], translations: [] };
   const STORAGE_KEY = "zhongda-med-english-cards-v1";
-  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const dayKey = (date = new Date()) => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part) => String(part).padStart(2, "0")).join("-");
+  const DEFAULT_WORD_GOAL = 20;
+  const MAX_WORD_GOAL = 60;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
@@ -13,7 +16,8 @@
     favorites: {},
     streak: 0,
     lastStudyDate: null,
-    todayDate: todayKey(),
+    dailyWordGoal: DEFAULT_WORD_GOAL,
+    todayDate: dayKey(),
     todayCount: 0
   };
 
@@ -37,10 +41,7 @@
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       const merged = { ...defaultStore, ...parsed };
-      if (merged.todayDate !== todayKey()) {
-        merged.todayDate = todayKey();
-        merged.todayCount = 0;
-      }
+      merged.dailyWordGoal = normalizeWordGoal(merged.dailyWordGoal, DEFAULT_WORD_GOAL);
       return merged;
     } catch {
       return { ...defaultStore };
@@ -49,6 +50,18 @@
 
   function saveStore() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  }
+
+  function normalizeWordGoal(value, fallback) {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(MAX_WORD_GOAL, Math.max(1, Math.trunc(value)));
+  }
+
+  function refreshDay() {
+    const today = dayKey();
+    if (store.todayDate === today) return;
+    store.todayDate = today;
+    store.todayCount = 0;
   }
 
   function shuffle(items) {
@@ -92,10 +105,25 @@
     return rating && (rating.status !== "good" || !rating.nextDue || rating.nextDue <= Date.now());
   }
 
+  function dailyWordPlan(words) {
+    const today = dayKey();
+    const remaining = words.filter((unit) => {
+      const updatedAt = store.ratings[unit.unitKey]?.updatedAt;
+      return !updatedAt || dayKey(new Date(updatedAt)) !== today;
+    });
+    const completed = words.length - remaining.length;
+    const goal = store.dailyWordGoal;
+    if (completed >= goal) return { completed, pool: words, roundSize: Math.min(goal, words.length) };
+    return { completed, pool: remaining, roundSize: Math.min(goal - completed, remaining.length) };
+  }
+
   function buildDeck(mode, specificUnit = null) {
     const units = allUnits();
     if (specificUnit) return [specificUnit];
-    if (mode === "word") return shuffle(units.words).slice(0, 20);
+    if (mode === "word") {
+      const { pool, roundSize } = dailyWordPlan(units.words);
+      return shuffle(pool).slice(0, roundSize);
+    }
     if (mode === "definition") return shuffle(units.definitions).slice(0, 20);
     if (mode === "translation") return shuffle(units.translations).slice(0, 20);
     if (mode === "review") {
@@ -133,10 +161,8 @@
   function renderCard() {
     const unit = currentUnit();
     if (!unit) return showSummary();
-    flipped = false;
-    $("#flashcard").classList.remove("flipped");
-    $("#ratingRow").classList.remove("ready");
-    $("#revealPrompt").textContent = "先回忆，再点击卡片翻面";
+    flipCard(false);
+    $("#flashcard").dataset.mode = unit.mode;
     $("#studyModeLabel").textContent = sessionMode === "review" ? `错题复习 · ${modeLabel(unit.mode)}` : modeLabel(sessionMode);
     $("#currentIndex").textContent = sessionIndex + 1;
     $("#totalCards").textContent = session.length;
@@ -198,15 +224,18 @@
     };
   }
 
-  function flipCard(force) {
-    flipped = typeof force === "boolean" ? force : !flipped;
-    $("#flashcard").classList.toggle("flipped", flipped);
+  function flipCard(showAnswer = !flipped) {
+    flipped = showAnswer;
+    $(".card-front").hidden = flipped;
+    $("#cardAnswer").hidden = !flipped;
+    $("#flashcard").setAttribute("aria-expanded", String(flipped));
     $("#ratingRow").classList.toggle("ready", flipped);
     $("#revealPrompt").textContent = flipped ? "现在按真实熟悉度选择" : "先回忆，再点击卡片翻面";
   }
 
   function rateCard(status) {
     if (!flipped) return;
+    refreshDay();
     const unit = currentUnit();
     const previous = store.ratings[unit.unitKey] || { count: 0 };
     const count = (previous.count || 0) + 1;
@@ -228,7 +257,7 @@
   }
 
   function updateStreak() {
-    const today = todayKey();
+    const today = dayKey();
     if (store.lastStudyDate === today) return;
     if (store.lastStudyDate && daysBetween(store.lastStudyDate, today) === 1) store.streak += 1;
     else store.streak = 1;
@@ -268,6 +297,7 @@
   }
 
   function renderDashboard() {
+    refreshDay();
     const units = allUnits().all;
     const mastered = Object.values(store.ratings).filter((x) => x.status === "good").length;
     const review = units.filter(isDue).length;
@@ -276,7 +306,16 @@
     $("#masteredValue").textContent = mastered;
     $("#reviewValue").textContent = review;
     $("#reviewDeckCount").textContent = review;
+    $("#dailyWordGoal").value = store.dailyWordGoal;
+    renderWordGoal();
     renderLibrary();
+  }
+
+  function renderWordGoal() {
+    const goal = store.dailyWordGoal;
+    const { completed, roundSize } = dailyWordPlan(allUnits().words);
+    $("#dailyWordProgress").textContent = `今天已背 ${completed} / ${goal} 个${completed >= goal ? " · 已达标" : ""}`;
+    $("#wordDeckDetail").textContent = `本轮 ${roundSize} 张 · 英文 → 中文`;
   }
 
   function renderCategoryChips() {
@@ -345,6 +384,21 @@
   }
 
   function bindEvents() {
+    const wordGoalInput = $("#dailyWordGoal");
+    function setWordGoal(goal) {
+      if (goal === store.dailyWordGoal) return;
+      store.dailyWordGoal = goal;
+      saveStore();
+      renderWordGoal();
+    }
+    wordGoalInput.addEventListener("input", () => {
+      const goal = wordGoalInput.valueAsNumber;
+      if (Number.isInteger(goal) && goal >= 1 && goal <= MAX_WORD_GOAL) setWordGoal(goal);
+    });
+    wordGoalInput.addEventListener("change", () => {
+      setWordGoal(normalizeWordGoal(wordGoalInput.valueAsNumber, store.dailyWordGoal));
+      wordGoalInput.value = store.dailyWordGoal;
+    });
     $$(".deck-option").forEach((button) => button.addEventListener("click", () => startSession(button.dataset.mode)));
     $("#shuffleAllButton").addEventListener("click", () => startSession("mixed"));
     $("#flashcard").addEventListener("click", (event) => {
