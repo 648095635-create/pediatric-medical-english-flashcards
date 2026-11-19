@@ -8,7 +8,7 @@
   <title>儿科学医学英语闪卡</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
   <div class="app-shell">
@@ -66,8 +66,13 @@
           <div class="deck-grid">
             <button class="deck-option" data-mode="word">
               <span class="deck-icon">Aa</span>
-              <span><strong>单词卡</strong><small id="wordDeckDetail">本轮 20 张 · 英文 → 中文</small></span>
-              <b>60</b>
+              <span><strong>单词卡</strong><small id="wordDeckDetail">儿科优先 · 本轮 20 张</small></span>
+              <b id="wordDeckCount">108</b>
+            </button>
+            <button class="deck-option" data-mode="general">
+              <span class="deck-icon">通</span>
+              <span><strong>通用医学单词</strong><small>问诊查体、检验、影像及成人内科</small></span>
+              <b id="generalDeckCount">48</b>
             </button>
             <button class="deck-option" data-mode="definition">
               <span class="deck-icon">Df</span>
@@ -84,6 +89,28 @@
               <span><strong>错题复习</strong><small>优先练“模糊 / 不会”</small></span>
               <b id="reviewDeckCount">0</b>
             </button>
+          </div>
+        </section>
+
+        <section class="panel cloud-panel" id="cloudPanel" aria-labelledby="cloudTitle" hidden>
+          <h2 id="cloudTitle">账号同步</h2>
+          <p id="cloudStatus" role="status">正在连接登录服务…</p>
+          <form class="cloud-form" id="cloudLoginForm">
+            <label>邮箱<input id="cloudEmail" type="email" autocomplete="username" required></label>
+            <label>密码<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
+            <button class="primary-button" id="cloudLoginButton" type="submit" disabled>登录并同步</button>
+          </form>
+          <div id="cloudAccount" hidden>
+            <div class="cloud-account-name"><strong id="cloudAccountName">我的账号</strong><span id="cloudAccountEmail"></span></div>
+            <form class="cloud-form cloud-profile" id="cloudProfileForm">
+              <label>我的昵称<input id="cloudNickname" type="text" maxlength="24" autocomplete="nickname" required></label>
+              <button class="secondary-button" type="submit">保存昵称</button>
+            </form>
+            <div class="cloud-actions">
+              <button class="text-button" id="cloudImportButton" type="button" hidden>合并本机旧记录</button>
+              <button class="text-button" id="cloudSyncButton" type="button">立即同步</button>
+              <button class="text-button" id="cloudLogoutButton" type="button">退出登录</button>
+            </div>
           </div>
         </section>
 
@@ -171,6 +198,10 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="data.js"></script>
-  <script src="app.js?v=2"></script>
+  <script src="general-terms.js?v=3"></script>
+  <script src="progress.js?v=3"></script>
+  <script src="cloud-config.js?v=3"></script>
+  <script src="cloud.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
